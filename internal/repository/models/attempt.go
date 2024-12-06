@@ -3,13 +3,12 @@ package models
 type AttemptStatus int8
 
 const (
-	AttemptStatusCreated          AttemptStatus = iota
-	AttemptStatusTesting          AttemptStatus = iota
 	AttemptStatusComplete         AttemptStatus = iota
-	AttemptStatusWrongAnswer      AttemptStatus = iota
 	AttemptStatusCompilationError AttemptStatus = iota
+	AttemptStatusRunningError AttemptStatus = iota
 	AttemptStatusOutOfMemory      AttemptStatus = iota
 	AttemptStatusTimeout          AttemptStatus = iota
+	AttemptStatusOutputOverflow AttemptStatus = iota
 )
 
 type TestStatus struct {

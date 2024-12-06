@@ -1,6 +1,9 @@
 package isolate
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 type runFailedError struct {
 	ErrorLogs  string
@@ -10,3 +13,5 @@ type runFailedError struct {
 func (r *runFailedError) Error() string {
 	return fmt.Sprintf("failed to run(%d)", r.StatusCode)
 }
+
+var OutputOverflowError = errors.New("output is too big")

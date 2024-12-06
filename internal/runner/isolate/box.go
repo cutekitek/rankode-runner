@@ -52,7 +52,7 @@ func (b *IsolatedBox) Run(params runParams, command string, args ...string) (*sh
 		fmt.Sprintf("-b %d", b.BoxId),
 		"-v",
 		"-s",
-		"--dir=/etc:noexec",
+		"--dir= /etc:noexec",
 	}
 	for k, v := range params.BindFiles {
 		isolateArgs = append(isolateArgs, fmt.Sprintf("--dir %s=%s", k, v))

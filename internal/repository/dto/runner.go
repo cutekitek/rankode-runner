@@ -11,8 +11,9 @@ type RunRequest struct {
 	Code      string
 	Input     []string
 	Timeout   time.Duration
-	// В байтах
 	MemoryLimit int
+	MaxFilesSize int
+	MaxOutputSize int
 }
 
 type RunResult struct {

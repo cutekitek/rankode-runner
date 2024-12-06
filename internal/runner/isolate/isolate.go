@@ -1,6 +1,8 @@
 package isolate
 
 import (
+	"bytes"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -9,6 +11,7 @@ import (
 	"github.com/Qwerty10291/rankode-runner/internal/repository/models"
 	"github.com/Qwerty10291/rankode-runner/internal/runner"
 	"github.com/Qwerty10291/rankode-runner/pkg/files"
+	"github.com/Qwerty10291/rankode-runner/pkg/shell"
 	"github.com/pkg/errors"
 )
 
@@ -52,7 +55,7 @@ func (r *isolateRunner) Run(req *dto.RunRequest) (*dto.RunResult, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to init box")
 	}
-	// defer box.Clean()
+	defer box.Clean()
 	err = r.initFiles(req, box, languageConfig)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create a code file")
@@ -68,8 +71,88 @@ func (r *isolateRunner) Run(req *dto.RunRequest) (*dto.RunResult, error) {
 		}
 	}
 
-	return nil, nil
+	result, err := r.run(req, box)
+	if err != nil{
+		return &dto.RunResult{
+			Status: models.AttemptStatusRunningError,
+			Error: "failed to run a test",
+		}, nil
+	}
+	
+
+	return result, nil
 }
+
+func (i *isolateRunner) run(req *dto.RunRequest, box *IsolatedBox) (*dto.RunResult, error) {
+	params := runParams{
+		MaxFileSize: int64(req.MaxFilesSize),
+		Timeout:     req.Timeout,
+		MemoryLimit: int64(req.MemoryLimit),
+	}
+	result := &dto.RunResult{}
+	for _, input := range req.Input {
+		cmd, err := box.Run(params, "runner")
+		if err != nil{
+			return nil, errors.Wrap(err, "failed to run test")
+		}
+		output, err := i.runProcessWithStdin(cmd, input, int64(req.MaxOutputSize))
+		if err != nil{
+			if errors.Is(err, OutputOverflowError) {
+				result.Status = models.AttemptStatusOutputOverflow
+				return result, nil
+			}
+
+		}
+		result.Output = append(result.Output, output)
+	}
+	result.Status = models.AttemptStatusComplete
+	return result, nil
+}
+
+func (i *isolateRunner) runProcessWithStdin(cmd *shell.Command, input string, maxBufferSize int64) (string, error) {
+	stdinPipe, err := cmd.Cmd.StdinPipe()
+	if err != nil{
+		return "", errors.Wrap(err, "failed to open stdin pipe:")
+	}
+	stdoutPipe, err := cmd.Cmd.StdoutPipe()
+	if err != nil{
+		return "", errors.Wrap(err, "failed to open stdout pipe:")
+	}
+	errChan := make(chan error)
+	var outputBuffer bytes.Buffer
+
+
+	if err := cmd.Cmd.Start(); err != nil{
+		return "", errors.Wrap(err, "failed to start runner process")
+	}
+	go func () {
+		defer stdinPipe.Close()
+		io.WriteString(stdinPipe, input)
+	}()
+	go func ()  {
+		defer stdoutPipe.Close()
+		for {
+			_, err := io.CopyN(&outputBuffer, stdoutPipe, 1024)
+			if err != nil {
+				if err == io.EOF {
+					return
+				}
+				errChan <- err
+			}
+			if outputBuffer.Len() > int(maxBufferSize) {
+				errChan <- OutputOverflowError
+			}
+		}
+	}()
+	go func () {
+	   errChan <- cmd.Cmd.Wait()
+	}()
+	
+	err = <-errChan
+	
+	return outputBuffer.String(), err
+}
+
 
 func (i *isolateRunner) build(cfg *languageConfig, box *IsolatedBox) error {
 	params := runParams{
@@ -81,7 +164,7 @@ func (i *isolateRunner) build(cfg *languageConfig, box *IsolatedBox) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to start builder process")
 	}
-	cmd.Cmd.Stdout = os.Stdout
+
 	if err := cmd.Cmd.Run(); err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			return &runFailedError{ErrorLogs: string(exitErr.Stderr), StatusCode: exitErr.ExitCode()}
