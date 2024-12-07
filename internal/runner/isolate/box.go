@@ -50,9 +50,7 @@ func (b *IsolatedBox) Run(params runParams, command string, args ...string) (*sh
 	isolateArgs := []string{
 		"--cg",
 		fmt.Sprintf("-b %d", b.BoxId),
-		"-v",
 		"-s",
-		"--dir= /etc:noexec",
 	}
 	for k, v := range params.BindFiles {
 		isolateArgs = append(isolateArgs, fmt.Sprintf("--dir %s=%s", k, v))
@@ -61,8 +59,8 @@ func (b *IsolatedBox) Run(params runParams, command string, args ...string) (*sh
 	isolateArgs = append(isolateArgs,
 		fmt.Sprintf("--fsize=%d", params.MaxFileSize),
 		fmt.Sprintf("--time=%f", params.Timeout.Seconds()),
-		fmt.Sprintf("--cg-mem=%d", params.MaxFileSize),
-		"--processes=10",
+		fmt.Sprintf("--cg-mem=%d", params.MemoryLimit),
+		"--processes=12",
 		"--run",
 		"--", command)
 	return shell.NewCommand(IsolatedExecPath, append(isolateArgs, args...)...)

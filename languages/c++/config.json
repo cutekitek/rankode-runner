@@ -1,0 +1,7 @@
+{
+    "build_script": "build.sh",
+    "build_memory_limit": 24000,
+    "build_timeout": 2000,
+    "build_max_file_size": 100,
+    "run_script": "run.sh"
+}

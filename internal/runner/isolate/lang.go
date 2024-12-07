@@ -12,7 +12,7 @@ type languageConfig struct {
 	RunScript        string        `json:"run_script"`
 	BuildMemoryLimit int           `json:"build_memory_limit"`
 	BuildTimeout     time.Duration `json:"build_timeout"`
-	BuildMaxFileSize int           `json:"build_file_size"`
+	BuildMaxFileSize int           `json:"build_max_file_size"`
 }
 
 func NewLangConfigFromFile(path string) (*languageConfig, error) {

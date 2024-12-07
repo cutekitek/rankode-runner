@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/Qwerty10291/rankode-runner/internal/repository/dto"
 	"github.com/Qwerty10291/rankode-runner/internal/runner/isolate"
@@ -20,15 +21,20 @@ func main() {
 	})
 	panicErr(err)
 	resp, err := runner.Run(&dto.RunRequest{
-		Image:       "go",
-		Code:        `package main
-		func main() {
-		println("test")
-		}`,
-		Input:       []string{},
-		Timeout:     100000,
-		MemoryLimit: 100000,
+		Image:       "c++",
+		Code:        `#include "stdio.h"
+
+int main() {
+    printf("test");
+}`,
+		Input:       []string{
+			"test",
+		},
+		Timeout:     time.Second,
+		MemoryLimit: 100000000,
+		MaxOutputSize: 1000000,
+		MaxFilesSize: 100000000,
 	})
 	panicErr(err)
-	fmt.Println(resp.Error, resp.Status)
+	fmt.Println(resp.Error, resp.Status, resp.Output)
 }

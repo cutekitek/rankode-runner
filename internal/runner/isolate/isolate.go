@@ -73,6 +73,7 @@ func (r *isolateRunner) Run(req *dto.RunRequest) (*dto.RunResult, error) {
 
 	result, err := r.run(req, box)
 	if err != nil{
+		
 		return &dto.RunResult{
 			Status: models.AttemptStatusRunningError,
 			Error: "failed to run a test",
@@ -121,35 +122,36 @@ func (i *isolateRunner) runProcessWithStdin(cmd *shell.Command, input string, ma
 	errChan := make(chan error)
 	var outputBuffer bytes.Buffer
 
-
-	if err := cmd.Cmd.Start(); err != nil{
-		return "", errors.Wrap(err, "failed to start runner process")
-	}
-	go func () {
-		defer stdinPipe.Close()
-		io.WriteString(stdinPipe, input)
-	}()
 	go func ()  {
 		defer stdoutPipe.Close()
 		for {
 			_, err := io.CopyN(&outputBuffer, stdoutPipe, 1024)
 			if err != nil {
 				if err == io.EOF {
-					return
+					continue
 				}
-				errChan <- err
+				return
 			}
 			if outputBuffer.Len() > int(maxBufferSize) {
 				errChan <- OutputOverflowError
 			}
 		}
 	}()
+
+	if err := cmd.Cmd.Start(); err != nil{
+		return "", errors.Wrap(err, "failed to start runner process")
+	}
+
+	go func () {
+		defer stdinPipe.Close()
+		io.WriteString(stdinPipe, input)
+	}()
+	
 	go func () {
 	   errChan <- cmd.Cmd.Wait()
 	}()
 	
 	err = <-errChan
-	
 	return outputBuffer.String(), err
 }
 
@@ -164,10 +166,10 @@ func (i *isolateRunner) build(cfg *languageConfig, box *IsolatedBox) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to start builder process")
 	}
-
-	if err := cmd.Cmd.Run(); err != nil {
+	
+	if out, err := cmd.Cmd.Output(); err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
-			return &runFailedError{ErrorLogs: string(exitErr.Stderr), StatusCode: exitErr.ExitCode()}
+			return &runFailedError{ErrorLogs: string(exitErr.Stderr) + string(out), StatusCode: exitErr.ExitCode()}
 		}
 	}
 
