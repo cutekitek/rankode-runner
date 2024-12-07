@@ -134,6 +134,7 @@ func (i *isolateRunner) runProcessWithStdin(cmd *shell.Command, input string, ma
 			}
 			if outputBuffer.Len() > int(maxBufferSize) {
 				errChan <- OutputOverflowError
+				cmd.Cmd.Process.Kill()
 			}
 		}
 	}()
