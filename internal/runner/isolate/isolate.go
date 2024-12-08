@@ -96,14 +96,27 @@ func (i *isolateRunner) run(req *dto.RunRequest, box *IsolatedBox) (*dto.RunResu
 		if err != nil{
 			return nil, errors.Wrap(err, "failed to run test")
 		}
-		output, err := i.runProcessWithStdin(cmd, input, int64(req.MaxOutputSize))
+		output, err := i.runProcessWithStdin(cmd.Command, input, int64(req.MaxOutputSize))
+		meta, _ := cmd.Meta.Collect()
+
+		result.MemoryUsage = int(meta.Memory)
 		if err != nil{
 			if errors.Is(err, OutputOverflowError) {
 				result.Status = models.AttemptStatusOutputOverflow
 				return result, nil
 			}
-
+			switch meta.Status{
+			case exitStatusOutOfMemory:
+				result.Status = models.AttemptStatusOutOfMemory
+			case exitStatusRuntimeError:
+				result.Status = models.AttemptStatusRunningError
+			case exitStatusTimeout:
+				result.Status = models.AttemptStatusTimeout
+			}
+			return result, nil
 		}
+		
+	
 		result.Output = append(result.Output, output)
 	}
 	result.Status = models.AttemptStatusComplete
@@ -167,13 +180,12 @@ func (i *isolateRunner) build(cfg *languageConfig, box *IsolatedBox) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to start builder process")
 	}
-	
 	if out, err := cmd.Cmd.Output(); err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			return &runFailedError{ErrorLogs: string(exitErr.Stderr) + string(out), StatusCode: exitErr.ExitCode()}
 		}
 	}
-
+	
 	return nil
 }
 

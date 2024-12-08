@@ -21,12 +21,8 @@ func main() {
 	})
 	panicErr(err)
 	resp, err := runner.Run(&dto.RunRequest{
-		Image:       "c++",
-		Code:        `#include "stdio.h"
-
-int main() {
-    printf("test");
-}`,
+		Image:       "python3",
+		Code:        `raise Exception("test")`,
 		Input:       []string{
 			"test",
 		},

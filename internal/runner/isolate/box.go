@@ -13,7 +13,6 @@ import (
 type IsolatedBox struct {
 	BoxId        int
 	FilesDir     string
-	metadataPath string
 }
 
 type runParams struct {
@@ -23,6 +22,11 @@ type runParams struct {
 	// kilobytes
 	MemoryLimit int64
 	BindFiles   map[string]string
+}
+
+type runnableWithMeta struct{
+	*shell.Command
+	Meta metaFile
 }
 
 func NewIsolatedBox(boxId int) (*IsolatedBox, error) {
@@ -35,18 +39,13 @@ func NewIsolatedBox(boxId int) (*IsolatedBox, error) {
 		return nil, errors.Wrap(err, "failed to init isolate box")
 	}
 	filesDir := filepath.Join(baseDir, "box")
-	metaPath, err := os.CreateTemp("", fmt.Sprintf("boxmeta_%d", boxId))
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create meta file")
-	}
 	return &IsolatedBox{
 		BoxId:        boxId,
 		FilesDir:     filesDir,
-		metadataPath: metaPath.Name(),
 	}, nil
 }
 
-func (b *IsolatedBox) Run(params runParams, command string, args ...string) (*shell.Command, error) {
+func (b *IsolatedBox) Run(params runParams, command string, args ...string) (*runnableWithMeta,  error) {
 	isolateArgs := []string{
 		"--cg",
 		fmt.Sprintf("-b %d", b.BoxId),
@@ -55,15 +54,23 @@ func (b *IsolatedBox) Run(params runParams, command string, args ...string) (*sh
 	for k, v := range params.BindFiles {
 		isolateArgs = append(isolateArgs, fmt.Sprintf("--dir %s=%s", k, v))
 	}
-
+	metafile, err := os.CreateTemp("", "boxmeta")
+	if err != nil{
+		return nil, errors.Wrap(err, "failed to create a meta file")
+	}
 	isolateArgs = append(isolateArgs,
+		"--meta="+metafile.Name(),
 		fmt.Sprintf("--fsize=%d", params.MaxFileSize),
 		fmt.Sprintf("--time=%f", params.Timeout.Seconds()),
 		fmt.Sprintf("--cg-mem=%d", params.MemoryLimit),
 		"--processes=12",
 		"--run",
 		"--", command)
-	return shell.NewCommand(IsolatedExecPath, append(isolateArgs, args...)...)
+	cmd, err := shell.NewCommand(IsolatedExecPath, append(isolateArgs, args...)...)
+	if err != nil{
+		return nil, err
+	}
+	return &runnableWithMeta{Command: cmd, Meta: metaFile{metafile}}, nil
 }
 
 func (b *IsolatedBox) CreateFile(filename string) (*os.File, error) {
