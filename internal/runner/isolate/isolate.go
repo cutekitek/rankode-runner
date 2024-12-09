@@ -103,7 +103,7 @@ func (i *isolateRunner) run(req *dto.RunRequest, box *IsolatedBox) (*dto.RunResu
 
 		result.MemoryUsage = int(meta.Memory)
 		result.ExecutionTime += meta.RunTime
-		caseStatus := dto.RunCaseResult{Output: output,Status: models.TestCaseStatusComplete}
+		caseStatus := dto.RunCaseResult{Output: output, Status: models.TestCaseStatusComplete}
 		
 		if err != nil {
 			switch meta.Status {

@@ -1,0 +1,15 @@
+{
+    "language": "python3",
+    "code": "print(input() + 'from test')",
+    "timeout": 10000,
+    "memory_limit": 100000,
+    "max_output_size": 1000,
+    "test_cases": [
+        {
+            "input": "first"
+        },
+        {
+            "input": "second"
+        }
+    ]
+}

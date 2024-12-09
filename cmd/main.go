@@ -1,10 +1,7 @@
 package main
 
 import (
-	"fmt"
-	"time"
-
-	"github.com/Qwerty10291/rankode-runner/internal/repository/dto"
+	"github.com/Qwerty10291/rankode-runner/internal/rabbitmq"
 	"github.com/Qwerty10291/rankode-runner/internal/runner/isolate"
 )
 
@@ -20,17 +17,17 @@ func main() {
 		RunnerScriptsPath: "languages",
 	})
 	panicErr(err)
-	resp, err := runner.Run(&dto.RunRequest{
-		Image:       "python3",
-		Code:        `raise Exception("test")`,
-		Input:       []string{
-			"test",
-		},
-		Timeout:     time.Second,
-		MemoryLimit: 100000000,
-		MaxOutputSize: 1000000,
-		MaxFilesSize: 100000000,
-	})
-	panicErr(err)
-	fmt.Println(resp.Error, resp.Status, resp.Output)
+	listener, err := rabbitmq.NewRabbitMQHandler(rabbitmq.RabbitMqHandlerConfig{
+		Login:        "ferret",
+		Password:     "qwerty1029",
+		Host:         "127.0.0.1",
+		Port:         5672, 
+		WorkersCount: 10,
+	}, runner)
+	if err != nil{
+		panicErr(err)
+	}
+	panicErr(listener.Start())
+	ch := make(chan struct{})
+	<-ch
 }

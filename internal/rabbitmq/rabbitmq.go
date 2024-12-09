@@ -39,8 +39,8 @@ type RabbitMQHandler struct {
 	closed       bool
 }
 
-func NewRabbitMQHandler(cfg RabbitMqHandlerConfig) (*RabbitMQHandler, error) {
-	return &RabbitMQHandler{cfg: cfg}, nil
+func NewRabbitMQHandler(cfg RabbitMqHandlerConfig, runner runner.Runner) (*RabbitMQHandler, error) {
+	return &RabbitMQHandler{cfg: cfg, runner: runner, wg: &sync.WaitGroup{}, tasksChan: make(chan models.AttemptRequest)}, nil
 }
 
 func (r *RabbitMQHandler) Start() error {
@@ -84,6 +84,11 @@ func (r *RabbitMQHandler) startProducer() error {
 	if err != nil {
 		return err
 	}
+	_, err = channel.QueueDeclare(respQueue, false, false, false, false, nil)
+	
+	if err != nil {
+		return err
+	}
 	r.producerChan = channel
 	return nil
 }
@@ -96,6 +101,7 @@ func (r *RabbitMQHandler) connect() error {
 	}
 	errChan := make(chan *amqp.Error)
 	conn.NotifyClose(errChan)
+	r.conn = conn
 	go func() {
 		<-errChan
 		if r.closed {
@@ -115,34 +121,40 @@ func (r *RabbitMQHandler) connect() error {
 
 func (r *RabbitMQHandler) listener(taskChan <-chan amqp.Delivery) {
 	for data := range taskChan {
+		fmt.Println(data)
 		var task models.AttemptRequest
 		if err := json.Unmarshal(data.Body, &task); err != nil {
-			slog.Error("invalid task message", "message", string(data.Body))
+			slog.Error("invalid task message", "message", string(data.Body), "error", err)
 			continue
 		}
 		r.tasksChan <- task
+		fmt.Println("sended")
 	}
 }
 
 func (r *RabbitMQHandler) worker() {
 	defer r.wg.Done()
-
+	slog.Info("start worker")
 	for task := range r.tasksChan {
+		
 		request := &dto.RunRequest{Image: task.Language, Code: task.Code, Timeout: time.Duration(task.Timeout) * time.Millisecond, MaxOutputSize: int(task.MaxOutputSize)}
 		for _, test := range task.TestCases {
 			request.Input = append(request.Input, test.InputData)
 		}
-
+		slog.Info("new task")
 		result, err := r.runner.Run(request)
 		if err != nil {
+			
 			r.send(&models.AttemptResponse{
 				Id:     task.Id,
 				Status: models.AttemptStatusInternalError,
 			})
 			continue
 		}
+		fmt.Println(*result)
 		r.send(mappers.RunResultToAttemptResult(&task, result))
 	}
+	slog.Info("end worker")
 }
 
 func (r *RabbitMQHandler) send(data *models.AttemptResponse) {
