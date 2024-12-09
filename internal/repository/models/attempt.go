@@ -1,29 +1,54 @@
 package models
 
-type AttemptStatus int8
+type TestCaseStatus uint8
 
 const (
-	AttemptStatusComplete         AttemptStatus = iota
-	AttemptStatusCompilationError AttemptStatus = iota
-	AttemptStatusRunningError AttemptStatus = iota
-	AttemptStatusOutOfMemory      AttemptStatus = iota
-	AttemptStatusTimeout          AttemptStatus = iota
-	AttemptStatusOutputOverflow AttemptStatus = iota
+	TestCaseStatusComplete         TestCaseStatus = iota
+	TestCaseStatusCompilationError TestCaseStatus = iota
+	TestCaseStatusRunningError     TestCaseStatus = iota
+	TestCaseStatusOutOfMemory      TestCaseStatus = iota
+	TestCaseStatusTimeout          TestCaseStatus = iota
+	TestCaseStatusOutputOverflow   TestCaseStatus = iota
 )
 
-type TestStatus struct {
-	TestId        int64         `json:"test_id"`
-	Status        AttemptStatus `json:"status"`
-	Output        string        `json:"output"`
-	ExecutionTime int64         `json:"execution_time"`
-	MemoryUsage   int64         `json:"memory_usage"`
+type AttemptStatus uint8
+
+const (
+	AttemptStatusSuccessful    AttemptStatus = iota
+	AttemptStatusBuildFailed   AttemptStatus = iota
+	AttemptStatusRunFailed     AttemptStatus = iota
+	AttemptStatusInternalError AttemptStatus = iota
+)
+
+type AttemptRequest struct {
+	Id            int64  `json:"id"`
+	Language      string `json:"language"`
+	Code          string `json:"code"`
+	MemoryLimit   int64  `json:"memory_limit"`
+	Timeout       int64  `json:"timeout"`
+	MaxOutputSize int64  `json:"max_output_size"`
+
+	TestCases []TestCase `json:"test_cases"`
 }
 
-type Attempt struct {
-	Id         int64
-	TaskId     int64
-	Status     AttemptStatus
-	LanguageId int
-	Code       string
-	Tests      []TestStatus
+type TestCase struct {
+	Id        int64  `db:"id" json:"id"`
+	Order     int32  `db:"order" json:"order"`
+	TaskId    int64  `db:"task_id" json:"task_id"`
+	InputData string `db:"input" json:"input"`
+}
+
+type AttemptResponse struct {
+	Id          int64         `json:"id"`
+	Status      AttemptStatus `json:"status"`
+	Error       string        `json:"error"`
+	MemoryUsage int64         `json:"memory_usage"`
+	Tests       []TestStatus  `json:"tests"`
+}
+
+type TestStatus struct {
+	CaseId        int64          `json:"test_id"`
+	Status        TestCaseStatus `json:"status"`
+	Output        string         `json:"output"`
+	ExecutionTime int64          `json:"execution_time"`
 }

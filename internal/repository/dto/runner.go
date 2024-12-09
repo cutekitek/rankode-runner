@@ -7,19 +7,24 @@ import (
 )
 
 type RunRequest struct {
-	Image     string
-	Code      string
-	Input     []string
-	Timeout   time.Duration
-	MemoryLimit int
-	MaxFilesSize int
+	Image         string
+	Code          string
+	Input         []string
+	Timeout       time.Duration
+	MemoryLimit   int
+	MaxFilesSize  int
 	MaxOutputSize int
 }
 
 type RunResult struct {
 	Status        models.AttemptStatus
-	Error string
-	Output        []string
-	ExecutionTime int64
+	Error         string
+	Output        []RunCaseResult
+	ExecutionTime time.Duration
 	MemoryUsage   int
+}
+
+type RunCaseResult struct {
+	Output string
+	Status models.TestCaseStatus
 }
