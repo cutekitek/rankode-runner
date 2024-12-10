@@ -65,21 +65,20 @@ func (r *isolateRunner) Run(req *dto.RunRequest) (*dto.RunResult, error) {
 	if err := r.build(languageConfig, box); err != nil {
 		if res, ok := err.(*runFailedError); ok {
 			return &dto.RunResult{
-				Status: models.AttemptStatusCompilationError,
+				Status: models.AttemptStatusBuildFailed,
 				Error:  res.ErrorLogs,
 			}, nil
 		}
 	}
 
 	result, err := r.run(req, box)
-	if err != nil{
-		
+	if err != nil {
+
 		return &dto.RunResult{
-			Status: models.AttemptStatusRunningError,
-			Error: "failed to run a test",
+			Status: models.AttemptStatusInternalError,
+			Error:  "failed to run a test",
 		}, nil
 	}
-	
 
 	return result, nil
 }
@@ -90,52 +89,59 @@ func (i *isolateRunner) run(req *dto.RunRequest, box *IsolatedBox) (*dto.RunResu
 		Timeout:     req.Timeout,
 		MemoryLimit: int64(req.MemoryLimit),
 	}
-	result := &dto.RunResult{}
+	result := &dto.RunResult{
+		Status: models.AttemptStatusSuccessful,
+	}
+
 	for _, input := range req.Input {
 		cmd, err := box.Run(params, "runner")
-		if err != nil{
+		if err != nil {
 			return nil, errors.Wrap(err, "failed to run test")
 		}
 		output, err := i.runProcessWithStdin(cmd.Command, input, int64(req.MaxOutputSize))
 		meta, _ := cmd.Meta.Collect()
 
 		result.MemoryUsage = int(meta.Memory)
-		if err != nil{
-			if errors.Is(err, OutputOverflowError) {
-				result.Status = models.AttemptStatusOutputOverflow
-				return result, nil
-			}
-			switch meta.Status{
+		result.ExecutionTime += meta.RunTime
+		caseStatus := dto.RunCaseResult{Output: output, Status: models.TestCaseStatusComplete}
+		
+		if err != nil {
+			switch meta.Status {
 			case exitStatusOutOfMemory:
-				result.Status = models.AttemptStatusOutOfMemory
+				caseStatus.Status = models.TestCaseStatusOutOfMemory
 			case exitStatusRuntimeError:
-				result.Status = models.AttemptStatusRunningError
+				caseStatus.Status = models.TestCaseStatusRunningError
 			case exitStatusTimeout:
-				result.Status = models.AttemptStatusTimeout
+				caseStatus.Status = models.TestCaseStatusTimeout
 			}
+
+			if errors.Is(err, OutputOverflowError) {
+				caseStatus.Status = models.TestCaseStatusOutputOverflow
+			}
+			
+			result.Status = models.AttemptStatusRunFailed
+			result.Output = append(result.Output, caseStatus)
 			return result, nil
 		}
-		
-	
-		result.Output = append(result.Output, output)
+
+		result.Output = append(result.Output, caseStatus)
 	}
-	result.Status = models.AttemptStatusComplete
 	return result, nil
 }
 
 func (i *isolateRunner) runProcessWithStdin(cmd *shell.Command, input string, maxBufferSize int64) (string, error) {
 	stdinPipe, err := cmd.Cmd.StdinPipe()
-	if err != nil{
+	if err != nil {
 		return "", errors.Wrap(err, "failed to open stdin pipe:")
 	}
 	stdoutPipe, err := cmd.Cmd.StdoutPipe()
-	if err != nil{
+	if err != nil {
 		return "", errors.Wrap(err, "failed to open stdout pipe:")
 	}
 	errChan := make(chan error)
 	var outputBuffer bytes.Buffer
 
-	go func ()  {
+	go func() {
 		defer stdoutPipe.Close()
 		for {
 			_, err := io.CopyN(&outputBuffer, stdoutPipe, 1024)
@@ -152,23 +158,22 @@ func (i *isolateRunner) runProcessWithStdin(cmd *shell.Command, input string, ma
 		}
 	}()
 
-	if err := cmd.Cmd.Start(); err != nil{
+	if err := cmd.Cmd.Start(); err != nil {
 		return "", errors.Wrap(err, "failed to start runner process")
 	}
 
-	go func () {
+	go func() {
 		defer stdinPipe.Close()
 		io.WriteString(stdinPipe, input)
 	}()
-	
-	go func () {
-	   errChan <- cmd.Cmd.Wait()
+
+	go func() {
+		errChan <- cmd.Cmd.Wait()
 	}()
-	
+
 	err = <-errChan
 	return outputBuffer.String(), err
 }
-
 
 func (i *isolateRunner) build(cfg *languageConfig, box *IsolatedBox) error {
 	params := runParams{
@@ -185,7 +190,7 @@ func (i *isolateRunner) build(cfg *languageConfig, box *IsolatedBox) error {
 			return &runFailedError{ErrorLogs: string(exitErr.Stderr) + string(out), StatusCode: exitErr.ExitCode()}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -209,7 +214,7 @@ func (i *isolateRunner) initFiles(req *dto.RunRequest, box *IsolatedBox, lang *l
 	if err := files.CopyFile(lang.RunScript, runScript); err != nil {
 		return errors.Wrap(err, "failed to create a run file")
 	}
-	
+
 	return nil
 }
 
