@@ -1,8 +1,8 @@
 package mappers
 
 import (
-	"github.com/Qwerty10291/rankode-runner/internal/repository/dto"
-	"github.com/Qwerty10291/rankode-runner/internal/repository/models"
+	"github.com/cutekitek/rankode-runner/internal/repository/dto"
+	"github.com/cutekitek/rankode-runner/internal/repository/models"
 )
 
 func RunResultToAttemptResult(req *models.AttemptRequest, result *dto.RunResult) *models.AttemptResponse {

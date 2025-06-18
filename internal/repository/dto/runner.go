@@ -3,7 +3,7 @@ package dto
 import (
 	"time"
 
-	"github.com/Qwerty10291/rankode-runner/internal/repository/models"
+	"github.com/cutekitek/rankode-runner/internal/repository/models"
 )
 
 type RunRequest struct {

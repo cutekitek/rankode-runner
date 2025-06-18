@@ -7,11 +7,11 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/Qwerty10291/rankode-runner/internal/repository/dto"
-	"github.com/Qwerty10291/rankode-runner/internal/repository/models"
-	"github.com/Qwerty10291/rankode-runner/internal/runner"
-	"github.com/Qwerty10291/rankode-runner/pkg/files"
-	"github.com/Qwerty10291/rankode-runner/pkg/shell"
+	"github.com/cutekitek/rankode-runner/internal/repository/dto"
+	"github.com/cutekitek/rankode-runner/internal/repository/models"
+	"github.com/cutekitek/rankode-runner/internal/runner"
+	"github.com/cutekitek/rankode-runner/pkg/files"
+	"github.com/cutekitek/rankode-runner/pkg/shell"
 	"github.com/pkg/errors"
 )
 
@@ -104,7 +104,7 @@ func (i *isolateRunner) run(req *dto.RunRequest, box *IsolatedBox) (*dto.RunResu
 		result.MemoryUsage = int(meta.Memory)
 		result.ExecutionTime += meta.RunTime
 		caseStatus := dto.RunCaseResult{Output: output, Status: models.TestCaseStatusComplete}
-		
+
 		if err != nil {
 			switch meta.Status {
 			case exitStatusOutOfMemory:
@@ -118,7 +118,7 @@ func (i *isolateRunner) run(req *dto.RunRequest, box *IsolatedBox) (*dto.RunResu
 			if errors.Is(err, OutputOverflowError) {
 				caseStatus.Status = models.TestCaseStatusOutputOverflow
 			}
-			
+
 			result.Status = models.AttemptStatusRunFailed
 			result.Output = append(result.Output, caseStatus)
 			return result, nil

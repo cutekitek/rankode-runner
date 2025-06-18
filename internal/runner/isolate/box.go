@@ -6,13 +6,13 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/Qwerty10291/rankode-runner/pkg/shell"
+	"github.com/cutekitek/rankode-runner/pkg/shell"
 	"github.com/pkg/errors"
 )
 
 type IsolatedBox struct {
-	BoxId        int
-	FilesDir     string
+	BoxId    int
+	FilesDir string
 }
 
 type runParams struct {
@@ -24,7 +24,7 @@ type runParams struct {
 	BindFiles   map[string]string
 }
 
-type runnableWithMeta struct{
+type runnableWithMeta struct {
 	*shell.Command
 	Meta metaFile
 }
@@ -40,12 +40,12 @@ func NewIsolatedBox(boxId int) (*IsolatedBox, error) {
 	}
 	filesDir := filepath.Join(baseDir, "box")
 	return &IsolatedBox{
-		BoxId:        boxId,
-		FilesDir:     filesDir,
+		BoxId:    boxId,
+		FilesDir: filesDir,
 	}, nil
 }
 
-func (b *IsolatedBox) Run(params runParams, command string, args ...string) (*runnableWithMeta,  error) {
+func (b *IsolatedBox) Run(params runParams, command string, args ...string) (*runnableWithMeta, error) {
 	isolateArgs := []string{
 		"--cg",
 		fmt.Sprintf("-b %d", b.BoxId),
@@ -55,7 +55,7 @@ func (b *IsolatedBox) Run(params runParams, command string, args ...string) (*ru
 		isolateArgs = append(isolateArgs, fmt.Sprintf("--dir %s=%s", k, v))
 	}
 	metafile, err := os.CreateTemp("", "boxmeta")
-	if err != nil{
+	if err != nil {
 		return nil, errors.Wrap(err, "failed to create a meta file")
 	}
 	isolateArgs = append(isolateArgs,
@@ -67,7 +67,7 @@ func (b *IsolatedBox) Run(params runParams, command string, args ...string) (*ru
 		"--run",
 		"--", command)
 	cmd, err := shell.NewCommand(IsolatedExecPath, append(isolateArgs, args...)...)
-	if err != nil{
+	if err != nil {
 		return nil, err
 	}
 	return &runnableWithMeta{Command: cmd, Meta: metaFile{metafile}}, nil

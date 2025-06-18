@@ -1,16 +1,18 @@
 package rabbitmq
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"sync"
 	"time"
 
-	"github.com/Qwerty10291/rankode-runner/internal/mappers"
-	"github.com/Qwerty10291/rankode-runner/internal/repository/dto"
-	"github.com/Qwerty10291/rankode-runner/internal/repository/models"
-	"github.com/Qwerty10291/rankode-runner/internal/runner"
+	"github.com/cutekitek/rankode-runner/internal/mappers"
+	"github.com/cutekitek/rankode-runner/internal/repository/dto"
+	"github.com/cutekitek/rankode-runner/internal/repository/models"
+	"github.com/cutekitek/rankode-runner/internal/runner"
 	"github.com/pkg/errors"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -28,6 +30,10 @@ type RabbitMqHandlerConfig struct {
 	WorkersCount int
 }
 
+type FileStorage interface {
+	GetFile(ctx context.Context, filename string) (io.Reader, error)
+}
+
 type RabbitMQHandler struct {
 	cfg          RabbitMqHandlerConfig
 	runner       runner.Runner
@@ -37,10 +43,11 @@ type RabbitMQHandler struct {
 	tasksChan    chan models.AttemptRequest
 	wg           *sync.WaitGroup
 	closed       bool
+	fileStorage FileStorage
 }
 
-func NewRabbitMQHandler(cfg RabbitMqHandlerConfig, runner runner.Runner) (*RabbitMQHandler, error) {
-	return &RabbitMQHandler{cfg: cfg, runner: runner, wg: &sync.WaitGroup{}, tasksChan: make(chan models.AttemptRequest)}, nil
+func NewRabbitMQHandler(cfg RabbitMqHandlerConfig, runner runner.Runner, storage FileStorage) (*RabbitMQHandler, error) {
+	return &RabbitMQHandler{cfg: cfg, runner: runner, wg: &sync.WaitGroup{}, tasksChan: make(chan models.AttemptRequest), fileStorage: storage}, nil
 }
 
 func (r *RabbitMQHandler) Start() error {
@@ -85,7 +92,7 @@ func (r *RabbitMQHandler) startProducer() error {
 		return err
 	}
 	_, err = channel.QueueDeclare(respQueue, false, false, false, false, nil)
-	
+
 	if err != nil {
 		return err
 	}
@@ -121,37 +128,58 @@ func (r *RabbitMQHandler) connect() error {
 
 func (r *RabbitMQHandler) listener(taskChan <-chan amqp.Delivery) {
 	for data := range taskChan {
-		fmt.Println(data)
 		var task models.AttemptRequest
 		if err := json.Unmarshal(data.Body, &task); err != nil {
 			slog.Error("invalid task message", "message", string(data.Body), "error", err)
 			continue
 		}
 		r.tasksChan <- task
-		fmt.Println("sended")
 	}
+}
+
+func (r *RabbitMQHandler) Close() {
+	close(r.tasksChan)
 }
 
 func (r *RabbitMQHandler) worker() {
 	defer r.wg.Done()
 	slog.Info("start worker")
 	for task := range r.tasksChan {
-		
+
 		request := &dto.RunRequest{Image: task.Language, Code: task.Code, Timeout: time.Duration(task.Timeout) * time.Millisecond, MaxOutputSize: int(task.MaxOutputSize)}
 		for _, test := range task.TestCases {
-			request.Input = append(request.Input, test.InputData)
+			input, err := r.fileStorage.GetFile(context.Background(), test.InputFileName)
+			if err != nil {
+				slog.Error("failed to load test file", "error", err)
+				r.send(&models.AttemptResponse{
+					Id: task.Id,
+					Status: models.AttemptStatusInternalError,
+					Error: fmt.Sprintf("failed to load test file %s: %s", test.InputFileName, err),
+				})
+				return
+			}
+			data, err := io.ReadAll(input)
+			if err != nil {
+				slog.Error("failed to load test file", "error", err)
+				r.send(&models.AttemptResponse{
+					Id: task.Id,
+					Status: models.AttemptStatusInternalError,
+					Error: fmt.Sprintf("failed to load test file %s: %s", test.InputFileName, err),
+				})
+				return
+			}
+
+			request.Input = append(request.Input, string(data))
 		}
-		slog.Info("new task")
 		result, err := r.runner.Run(request)
 		if err != nil {
-			
+			slog.Error("failed to run task", "error", err)
 			r.send(&models.AttemptResponse{
 				Id:     task.Id,
 				Status: models.AttemptStatusInternalError,
 			})
 			continue
 		}
-		fmt.Println(*result)
 		r.send(mappers.RunResultToAttemptResult(&task, result))
 	}
 	slog.Info("end worker")

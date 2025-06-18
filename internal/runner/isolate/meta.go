@@ -7,16 +7,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Qwerty10291/rankode-runner/pkg/utils"
+	"github.com/cutekitek/rankode-runner/pkg/utils"
 	"github.com/pkg/errors"
 )
 
 type exitStatus int
 
 const (
-	exitStatusOk exitStatus = iota
-	exitStatusTimeout exitStatus = iota
-	exitStatusOutOfMemory exitStatus = iota
+	exitStatusOk           exitStatus = iota
+	exitStatusTimeout      exitStatus = iota
+	exitStatusOutOfMemory  exitStatus = iota
 	exitStatusRuntimeError exitStatus = iota
 )
 
@@ -25,10 +25,10 @@ type metaFile struct {
 }
 
 type metaData struct {
-	RunTime time.Duration
-	Memory int64
+	RunTime    time.Duration
+	Memory     int64
 	StatusCode int
-	Status exitStatus
+	Status     exitStatus
 }
 
 func (m metaFile) Collect() (*metaData, error) {
@@ -65,4 +65,3 @@ func (m metaFile) Collect() (*metaData, error) {
 	}
 
 }
-

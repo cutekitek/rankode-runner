@@ -1,7 +1,6 @@
 package shell
 
-import (
-	"fmt"
+import (	
 	"io"
 	"os/exec"
 	"strings"
@@ -17,7 +16,6 @@ type Command struct {
 }
 
 func NewCommand(command string, args ...string) (*Command, error) {
-	fmt.Println(command, args)
 	cmd := exec.Command(command, args...)
 
 	// stdin, err := cmd.StdinPipe()
