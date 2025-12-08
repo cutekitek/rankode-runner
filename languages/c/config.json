@@ -1,5 +1,5 @@
 {
-    "build": ["/usr/bin/go", "build", "-o", "run", "code"],
+    "build": ["/usr/bin/gcc", "-O2", "-x", "c", "-o", "run", "code"],
     "build_memory_limit": 134217728,
     "build_timeout": 2000000,
     "build_max_file_size": 10000000,

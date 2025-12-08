@@ -4,21 +4,20 @@ import (
 	"context"
 	"io"
 
-
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
 type FileStorage struct {
-	cl *minio.Client
+	cl     *minio.Client
 	Bucket string
 }
 
 type Config struct {
-	Url string
-	Login string
+	Url      string
+	Login    string
 	Password string
-	Bucket string
+	Bucket   string
 }
 
 func NewFileStorage(cfg Config) *FileStorage {
@@ -30,7 +29,6 @@ func NewFileStorage(cfg Config) *FileStorage {
 	}
 	return &FileStorage{cl: client, Bucket: cfg.Bucket}
 }
-
 
 func (s *FileStorage) GetFile(ctx context.Context, filename string) (io.Reader, error) {
 	file, err := s.cl.GetObject(ctx, s.Bucket, filename, minio.GetObjectOptions{})

@@ -115,7 +115,7 @@ func (i *isolateRunner) run(req *dto.RunRequest, box *IsolatedBox) (*dto.RunResu
 				caseStatus.Status = models.TestCaseStatusTimeout
 			}
 
-			if errors.Is(err, OutputOverflowError) {
+			if errors.Is(err, OutputOverflowErr) {
 				caseStatus.Status = models.TestCaseStatusOutputOverflow
 			}
 
@@ -152,7 +152,7 @@ func (i *isolateRunner) runProcessWithStdin(cmd *shell.Command, input string, ma
 				return
 			}
 			if outputBuffer.Len() > int(maxBufferSize) {
-				errChan <- OutputOverflowError
+				errChan <- OutputOverflowErr
 				cmd.Cmd.Process.Kill()
 			}
 		}

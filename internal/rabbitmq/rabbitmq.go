@@ -18,8 +18,8 @@ import (
 )
 
 const (
-	reqQueue  = "tasks-req"
-	respQueue = "task-resp"
+	reqQueue  = "rankode-req"
+	respQueue = "rankode-resp"
 )
 
 type RabbitMqHandlerConfig struct {
@@ -43,7 +43,7 @@ type RabbitMQHandler struct {
 	tasksChan    chan models.AttemptRequest
 	wg           *sync.WaitGroup
 	closed       bool
-	fileStorage FileStorage
+	fileStorage  FileStorage
 }
 
 func NewRabbitMQHandler(cfg RabbitMqHandlerConfig, runner runner.Runner, storage FileStorage) (*RabbitMQHandler, error) {
@@ -139,11 +139,12 @@ func (r *RabbitMQHandler) listener(taskChan <-chan amqp.Delivery) {
 
 func (r *RabbitMQHandler) Close() {
 	close(r.tasksChan)
+	r.wg.Wait()
+	r.conn.Close()
 }
 
 func (r *RabbitMQHandler) worker() {
 	defer r.wg.Done()
-	slog.Info("start worker")
 	for task := range r.tasksChan {
 
 		request := &dto.RunRequest{Image: task.Language, Code: task.Code, Timeout: time.Duration(task.Timeout) * time.Millisecond, MaxOutputSize: int(task.MaxOutputSize)}
@@ -152,9 +153,9 @@ func (r *RabbitMQHandler) worker() {
 			if err != nil {
 				slog.Error("failed to load test file", "error", err)
 				r.send(&models.AttemptResponse{
-					Id: task.Id,
+					Id:     task.Id,
 					Status: models.AttemptStatusInternalError,
-					Error: fmt.Sprintf("failed to load test file %s: %s", test.InputFileName, err),
+					Error:  fmt.Sprintf("failed to load test file %s: %s", test.InputFileName, err),
 				})
 				return
 			}
@@ -162,9 +163,9 @@ func (r *RabbitMQHandler) worker() {
 			if err != nil {
 				slog.Error("failed to load test file", "error", err)
 				r.send(&models.AttemptResponse{
-					Id: task.Id,
+					Id:     task.Id,
 					Status: models.AttemptStatusInternalError,
-					Error: fmt.Sprintf("failed to load test file %s: %s", test.InputFileName, err),
+					Error:  fmt.Sprintf("failed to load test file %s: %s", test.InputFileName, err),
 				})
 				return
 			}

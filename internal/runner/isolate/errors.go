@@ -14,4 +14,4 @@ func (r *runFailedError) Error() string {
 	return fmt.Sprintf("failed to run(%d)", r.StatusCode)
 }
 
-var OutputOverflowError = errors.New("output is too big")
+var OutputOverflowErr = errors.New("output is too big")

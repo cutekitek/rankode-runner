@@ -18,7 +18,7 @@ const (
 	AttemptStatusBuildFailed   AttemptStatus = iota
 	AttemptStatusRunFailed     AttemptStatus = iota
 	AttemptStatusInternalError AttemptStatus = iota
-	AttemptStatusCreated AttemptStatus = iota
+	AttemptStatusCreated       AttemptStatus = iota
 )
 
 type AttemptRequest struct {
@@ -33,8 +33,8 @@ type AttemptRequest struct {
 }
 
 type TestCase struct {
-	Id        int64  `json:"id"`
-	Order     int32  `json:"order"`
+	Id            int64  `json:"id"`
+	Order         int32  `json:"order"`
 	InputFileName string `json:"input_file"`
 }
 

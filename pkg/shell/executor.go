@@ -1,6 +1,6 @@
 package shell
 
-import (	
+import (
 	"io"
 	"os/exec"
 	"strings"
@@ -9,8 +9,8 @@ import (
 )
 
 type Command struct {
-	Cmd *exec.Cmd
-	StdIn io.WriteCloser
+	Cmd    *exec.Cmd
+	StdIn  io.WriteCloser
 	StdOut io.ReadCloser
 	StdErr io.ReadCloser
 }
@@ -27,7 +27,7 @@ func NewCommand(command string, args ...string) (*Command, error) {
 	// 	return nil, errors.Wrap(err, "failed to open stdout pipe")
 	// }
 	stderr, err := cmd.StderrPipe()
-	if err != nil{
+	if err != nil {
 		return nil, errors.Wrap(err, "failed to open stderr pipe")
 	}
 	return &Command{
@@ -35,10 +35,8 @@ func NewCommand(command string, args ...string) (*Command, error) {
 		// StdIn:  stdin,
 		// StdOut: stdout,
 		StdErr: stderr,
-	},nil
+	}, nil
 }
-
-
 
 func (c *Command) RunAndCollectStdout() (string, error) {
 	data, err := c.Cmd.Output()

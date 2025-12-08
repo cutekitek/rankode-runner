@@ -1,7 +1,7 @@
 {
-    "build": ["/usr/bin/go", "build", "-o", "run", "code"],
+    "build": [],
     "build_memory_limit": 134217728,
     "build_timeout": 2000000,
     "build_max_file_size": 10000000,
-    "run": ["./run"]
+    "run": ["/usr/bin/bun", "code"]
 }

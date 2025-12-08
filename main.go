@@ -19,8 +19,8 @@ const (
 	amqpURL = "amqp://rankode:fobeagTB8Ojo3R@localhost:6672/"
 
 	// Названия очередей
-	requestQueueName  = "tasks-req"
-	responseQueueName = "task-resp"
+	requestQueueName  = "rankode-req"
+	responseQueueName = "rankode-resp"
 
 	// Количество потоков для отправки сообщений
 	publisherCount = 10
@@ -52,7 +52,7 @@ func failOnError(err error, msg string) {
 func publisher(wg *sync.WaitGroup, ch *amqp091.Channel, done <-chan struct{}, body []byte) {
 	defer wg.Done()
 
-	for {
+	for i := 0; i < 1000; i++ {
 		select {
 		case <-done: // Если получен сигнал о завершении, выходим из функции
 			log.Println("Publisher is shutting down.")
@@ -61,10 +61,10 @@ func publisher(wg *sync.WaitGroup, ch *amqp091.Channel, done <-chan struct{}, bo
 			// Отправляем сообщение
 			err := ch.PublishWithContext(
 				context.Background(), // Используем фоновый контекст
-				"",                 // exchange (пусто - default)
-				requestQueueName,   // routing key (имя очереди)
-				false,              // mandatory
-				false,              // immediate
+				"",                   // exchange (пусто - default)
+				requestQueueName,     // routing key (имя очереди)
+				false,                // mandatory
+				false,                // immediate
 				amqp091.Publishing{
 					ContentType: "application/json",
 					Body:        body,
