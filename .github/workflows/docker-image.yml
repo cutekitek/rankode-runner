@@ -49,3 +49,5 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha # Caches layers on GitHub to speed up future builds
           cache-to: type=gha,mode=max
+          build-args: |
+            LANGUAGES=python,c,c++,js,java,go
