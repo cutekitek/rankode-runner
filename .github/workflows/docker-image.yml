@@ -1,39 +1,51 @@
-name: Docker Image CI
+name: Build and Push Docker Image
 
-# Triggers the workflow on push to the 'main' branch
 on:
   push:
-    branches: [ "master" ]
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
-
-# Define environment variables for easy reuse
-env:
-  DOCKER_HUB_REPO: qwerty1029/rankode-runner  # IMPORTANT: Change this!
+    branches:
+      - master  # Runs on pushes to the main branch
+    tags:
+      - 'v*'  # Also runs if you push a tag like v1.0
 
 jobs:
-  build_and_push_docker:
+  build-and-push:
     runs-on: ubuntu-latest
-    
+
     steps:
-      # Step 1: Checkout the repository code
-      - name: Checkout repository
+      # 1. Checkout the code
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      # Step 3: Set up Docker Buildx (Essential for modern builds)
+      # 2. Set up Docker Buildx (required for advanced building/caching)
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Step 4: Log in to Docker Hub
-      - name: Log in to Docker Hub
+      # 3. Login to Docker Hub
+      - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and Push Docker image
-        uses: docker/build-and-push-action@v6
+      # 4. Extract metadata (tags, labels) for Docker
+      # This automatically creates tags like 'latest' or 'v1.0' based on git context
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            qwerty1029/rankode-runner
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=tag
+
+      # 5. Build and push Docker image
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: ${{ env.DOCKER_HUB_REPO }}:latest
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha # Caches layers on GitHub to speed up future builds
+          cache-to: type=gha,mode=max
