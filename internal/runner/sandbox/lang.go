@@ -13,6 +13,7 @@ type languageConfig struct {
 	BuildMemoryLimit int           `json:"build_memory_limit"`
 	BuildTimeout     time.Duration `json:"build_timeout"`
 	BuildMaxFileSize int           `json:"build_max_file_size"`
+	CodeFile string `json:"codefile"`
 }
 
 func NewLangConfigFromFile(path string) (*languageConfig, error) {

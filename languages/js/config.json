@@ -1,7 +1,8 @@
 {
     "build": [],
-    "build_memory_limit": 134217728,
+    "build_memory_limit": 536870912,
     "build_timeout": 2000000,
     "build_max_file_size": 10000000,
-    "run": ["/usr/bin/bun", "code"]
+    "run": ["/usr/bin/node", "main.js"],
+    "codefile": "main.js"
 }

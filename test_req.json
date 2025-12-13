@@ -1,18 +1,12 @@
 {
-    "language": "python3",
-    "code": "print(input() + 'from test')",
-    "timeout": 10000,
-    "memory_limit": 100000,
-    "max_output_size": 1000,
+    "language": "go",
+    "code": "package main\n import \"fmt\"\n func main() {fmt.Print(\"Hello world!\")}",
+    "timeout": 100000,
+    "memory_limit": 1000000,
+    "max_output_size": 100000000,
     "test_cases": [
         {
             "input_file": "test_case_input_2_0"
-        },
-        {
-            "input_file": "test_case_input_2_1"
-        },
-        {
-            "input_file": "test_case_input_2_2"
         }
     ]
 }

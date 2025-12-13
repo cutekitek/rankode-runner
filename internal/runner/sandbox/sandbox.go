@@ -10,8 +10,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"syscall"
-
-	// "io"
 	"os"
 	"path/filepath"
 	"time"
@@ -150,10 +148,13 @@ func (r *SandboxRunner) getLangConfig(req *dto.RunRequest) (*languageConfig, err
 }
 
 func (r *SandboxRunner) initFiles(req *dto.RunRequest, env container.Environment, lang *languageConfig) error {
+	codeFile := "/w/code"
+	if lang.CodeFile != "" {
+		codeFile = "/w/" + lang.CodeFile
+	}
+	
 	files, err := env.Open([]container.OpenCmd{
-		{Path: "/w/code", Flag: os.O_WRONLY | os.O_CREATE | os.O_TRUNC, Perm: 0777},
-		{Path: "/w/builder", Flag: os.O_WRONLY | os.O_CREATE | os.O_TRUNC, Perm: 0777},
-		{Path: "/w/runner", Flag: os.O_WRONLY | os.O_CREATE | os.O_TRUNC, Perm: 0777},
+		{Path: codeFile, Flag: os.O_WRONLY | os.O_CREATE | os.O_TRUNC, Perm: 0777},
 	})
 	if err != nil {
 		return fmt.Errorf("failed to open files in container: %w", err)
@@ -331,7 +332,7 @@ func (r *SandboxRunner) ExecuteInSandbox(params RunParams) (*executionResult, er
 		Environment: params.ContainerEnv,
 		ExecveParam: container.ExecveParam{
 			Args:     params.Args,
-			Env:      []string{"PATH=/usr/local/bin:/usr/bin:/bin"},
+			Env:      []string{"PATH=/usr/local/bin:/usr/bin:/bin", "GOCACHE=/tmp/gocache"},
 			Files:    []uintptr{stdinR.Fd(), stdoutW.Fd(), stderrW.Fd()},
 			RLimits:  rlims.PrepareRLimit(),
 			SyncFunc: syncFunc,
@@ -354,7 +355,7 @@ func (r *SandboxRunner) ExecuteInSandbox(params RunParams) (*executionResult, er
 		Time:       res.Time,
 		Memory:     res.Memory,
 		Output:     stdout.Bytes(),
-		Error:      stdout.Bytes(),
+		Error:      stderr.Bytes(),
 	}
 
 	if useCGroup := (cg != nil); useCGroup {
@@ -370,7 +371,7 @@ func (r *SandboxRunner) ExecuteInSandbox(params RunParams) (*executionResult, er
 		execRes.Status = runner.StatusOutputLimitExceeded
 	}
 
-	slog.Debug("execution result", "status", execRes.Status, "exitStatus", execRes.ExitStatus, "memory", execRes.Memory, "error", res.Error, "output", execRes.Output, "time", execRes.Time)
+	slog.Debug("execution result", "status", execRes.Status, "exitStatus", execRes.ExitStatus, "memory", execRes.Memory, "error", res.Error, "output", execRes.Output, "stderr", execRes.Error, "time", execRes.Time)
 
 	return execRes, nil
 }
@@ -414,7 +415,6 @@ func pipeWriter(ctx context.Context, pipe *os.File, in string) {
 }
 
 func (r *SandboxRunner) PrepareContainer(workdir string) (container.Environment, error) {
-
 	mb := mount.NewBuilder().
 		WithBind("/bin", "bin", true).
 		WithBind("/lib", "lib", true).
@@ -423,8 +423,8 @@ func (r *SandboxRunner) PrepareContainer(workdir string) (container.Environment,
 		WithBind("/etc/ld.so.cache", "/etc/ld.so.cache", true).
 		WithProc().
 		WithBind("/dev/null", "dev/null", false).
-		WithTmpfs("tmp", "size=8m,nr_inodes=4k").
-		WithTmpfs("w", "size=8m,nr_inodes=4k").
+		WithTmpfs("tmp", "size=128m,nr_inodes=4k").
+		WithTmpfs("w", "size=32m,nr_inodes=4k").
 		FilterNotExist()
 
 	mounts := mb.FilterNotExist()
