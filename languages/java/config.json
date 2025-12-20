@@ -1,7 +1,8 @@
 {
-    "build": ["/usr/bin/java", "build", "-o", "run", "code"],
+    "build": [],
     "build_memory_limit": 134217728,
     "build_timeout": 2000000,
     "build_max_file_size": 10000000,
-    "run": ["./run"]
+    "codefile": "Main.java",
+    "run": ["/usr/lib/jvm/java-21-openjdk-arm64/bin/java", "Main.java"]
 }

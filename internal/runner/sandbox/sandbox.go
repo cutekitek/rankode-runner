@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
-	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/criyle/go-sandbox/container"
@@ -152,7 +152,7 @@ func (r *SandboxRunner) initFiles(req *dto.RunRequest, env container.Environment
 	if lang.CodeFile != "" {
 		codeFile = "/w/" + lang.CodeFile
 	}
-	
+
 	files, err := env.Open([]container.OpenCmd{
 		{Path: codeFile, Flag: os.O_WRONLY | os.O_CREATE | os.O_TRUNC, Perm: 0777},
 	})
@@ -214,7 +214,7 @@ func (r *SandboxRunner) runTestCases(req *dto.RunRequest, cenv container.Environ
 			ContainerEnv:  cenv,
 			Args:          cfg.RunCmd,
 			MaxFileSize:   int64(req.MaxOutputSize),
-			Timeout:       time.Duration(req.Timeout) * time.Millisecond,
+			Timeout:       req.Timeout,
 			MemoryLimit:   int64(req.MemoryLimit),
 			Input:         input,
 			MaxOutputSize: int64(req.MaxOutputSize),
@@ -324,7 +324,6 @@ func (r *SandboxRunner) ExecuteInSandbox(params RunParams) (*executionResult, er
 		CPUHard:  uint64(params.Timeout.Seconds()) + 2,
 		FileSize: uint64(params.MaxFileSize),
 		Stack:    128 * 1024 * 1024,
-		Data:     uint64(params.MemoryLimit),
 		OpenFile: 2048,
 	}
 
@@ -332,7 +331,7 @@ func (r *SandboxRunner) ExecuteInSandbox(params RunParams) (*executionResult, er
 		Environment: params.ContainerEnv,
 		ExecveParam: container.ExecveParam{
 			Args:     params.Args,
-			Env:      []string{"PATH=/usr/local/bin:/usr/bin:/bin", "GOCACHE=/tmp/gocache"},
+			Env:      []string{"PATH=/usr/local/bin:/usr/bin:/bin", "GOCACHE=/tmp/gocache", "JAVA_HOME=/etc/java-21-openjdk"},
 			Files:    []uintptr{stdinR.Fd(), stdoutW.Fd(), stderrW.Fd()},
 			RLimits:  rlims.PrepareRLimit(),
 			SyncFunc: syncFunc,
@@ -420,9 +419,17 @@ func (r *SandboxRunner) PrepareContainer(workdir string) (container.Environment,
 		WithBind("/lib", "lib", true).
 		WithBind("/lib64", "lib64", true).
 		WithBind("/usr", "usr", true).
-		WithBind("/etc/ld.so.cache", "/etc/ld.so.cache", true).
+		WithBind("/etc/ld.so.cache", "etc/ld.so.cache", true).
+		WithBind("/etc/alternatives", "etc/alternatives", true).
+		WithBind("/etc/java-21-openjdk", "etc/java-21-openjdk", true).
+		WithBind("/etc/ssl", "etc/ssl", true).                 // SSL Certs
+		WithBind("/etc/pki", "etc/pki", true).                 // CA Certs (RedHat/Fedora)
+		WithBind("/etc/crypto-policies", "etc/crypto-policies", true). // Crypto policies
+		WithBind("/etc/ca-certificates", "etc/ca-certificates", true). // Ubuntu/Debian Certs
 		WithProc().
 		WithBind("/dev/null", "dev/null", false).
+		WithBind("/dev/urandom", "dev/urandom", false).
+		WithBind("/dev/random", "dev/random", false).
 		WithTmpfs("tmp", "size=128m,nr_inodes=4k").
 		WithTmpfs("w", "size=32m,nr_inodes=4k").
 		FilterNotExist()
@@ -438,6 +445,12 @@ func (r *SandboxRunner) PrepareContainer(workdir string) (container.Environment,
 		Stderr:        os.Stderr,
 		CredGenerator: newCredGen(),
 		CloneFlags:    uintptr(cloneFlag),
+		SymbolicLinks: []container.SymbolicLink{
+			{LinkPath:"/dev/fd", Target:"/proc/self/fd"}, 
+			{LinkPath:"/dev/stdin", Target:"/proc/self/fd/0"}, 
+			{LinkPath:"/dev/stdout", Target:"/proc/self/fd/1"}, 
+			{LinkPath:"/dev/stderr", Target:"/proc/self/fd/2"},
+		},
 	}
 	return b.Build()
 }
