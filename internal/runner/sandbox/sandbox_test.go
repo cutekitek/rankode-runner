@@ -2,7 +2,6 @@ package sandbox
 
 import (
 	"fmt"
-	"log/slog"
 	"os"
 
 	"testing"
@@ -23,7 +22,7 @@ func initSandbox() error {
 		ContainersPoolSize: 15,
 	}
 	var err error
-	sbRunner, err = NewSandboxRunner(cfg)
+	sbRunner = NewSandboxRunner(cfg)
 	if err != nil {
 		return err
 	}
@@ -46,8 +45,6 @@ func TestMain(m *testing.M) {
 }
 
 func TestSandboxRunner_HelloWorld(t *testing.T) {
-	t.Skip()
-	slog.SetLogLoggerLevel(slog.LevelDebug)
 	tests := []struct {
 		language string
 		code     string
@@ -189,7 +186,7 @@ public class Main {
 		{
 			language: "js",
 			code: `const fs = require('fs');
-const data = fs.readFileSync('/dev/stdin', 'utf8').trim();
+const data = fs.readFileSync(0, 'utf8').trim();
 console.log(Number(data) * 2);`,
 			input:    []string{"5"},
 			expected: "10\n",
@@ -235,7 +232,6 @@ if data:
 }
 
 func TestSandboxRunner_BuildFailure(t *testing.T) {
-	t.Skip()
 	tests := []struct {
 		language string
 		code     string

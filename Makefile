@@ -7,4 +7,4 @@ test-sandbox:
 	sudo go test -v ./internal/runner/sandbox
 
 benchmark:
-	go test -bench=. ./benchmarks
+	sudo go test -bench=. ./benchmarks

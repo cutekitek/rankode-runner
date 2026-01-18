@@ -11,7 +11,7 @@ type runFailedError struct {
 }
 
 func (r *runFailedError) Error() string {
-	return fmt.Sprintf("failed to run(%d)", r.StatusCode)
+	return fmt.Sprintf("failed to run(%d): %s", r.StatusCode, r.ErrorLogs)
 }
 
 var OutputOverflowErr = errors.New("output is too big")

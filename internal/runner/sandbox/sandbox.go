@@ -7,6 +7,8 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -25,7 +27,14 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-var rootCG cgroup.Cgroup
+const (
+	goCacheShared = "/tmp/rankode-gocache-shared"
+)
+
+var (
+	rootCG      cgroup.Cgroup
+	goCacheOnce sync.Once
+)
 
 func init() {
 	container.Init()
@@ -69,15 +78,45 @@ func (r *containerRunner) Run(c context.Context) runner.Result {
 	return r.Execve(c, r.ExecveParam)
 }
 
-func NewSandboxRunner(cfg SandboxRunnerConfig) (*SandboxRunner, error) {
+func NewSandboxRunner(cfg SandboxRunnerConfig) *SandboxRunner {
 	return &SandboxRunner{
 		Config:     cfg,
 		containers: make(chan *sandboxContainerEnv, cfg.ContainersPoolSize),
-	}, nil
+	}
 }
 
 func (r *SandboxRunner) Init() error {
+	r.initSharedGoCache()
 	return r.prepareContainers()
+}
+
+func (r *SandboxRunner) initSharedGoCache() {
+	goCacheOnce.Do(func() {
+		if _, err := os.Stat(goCacheShared); os.IsNotExist(err) {
+			if err := os.MkdirAll(goCacheShared, 0777); err != nil {
+				slog.Error("failed to create shared Go cache directory", "error", err)
+				return
+			}
+		}
+		goPath, err := exec.LookPath("go")
+		if err != nil {
+			slog.Info("go binary not found, skipping shared cache population")
+			return
+		}
+		slog.Info("Populating shared Go cache...", "path", goCacheShared)
+		cmd := exec.Command(goPath, "build", "std")
+		cmd.Env = append(os.Environ(), "GOCACHE="+goCacheShared)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			slog.Error("failed to populate shared Go cache", "error", err, "output", string(out))
+		} else {
+			slog.Info("Shared Go cache populated successfully")
+		}
+		// Recursive chmod to ensure container user can read/traverse
+		if err := exec.Command("chmod", "-R", "777", goCacheShared).Run(); err != nil {
+			slog.Error("failed to chmod shared Go cache", "error", err)
+		}
+		slog.Info("Shared Go cache populated successfully", "path", goCacheShared)
+	})
 }
 
 func (r *SandboxRunner) Close() {
@@ -196,10 +235,10 @@ func (r *SandboxRunner) build(cfg *languageConfig, cenv container.Environment) e
 	}
 
 	if res.Status != runner.StatusNormal {
-		return &runFailedError{ErrorLogs: string(res.Output), StatusCode: res.ExitStatus}
+		return &runFailedError{ErrorLogs: string(res.Error), StatusCode: res.ExitStatus}
 	}
 	if res.ExitStatus != 0 {
-		return &runFailedError{ErrorLogs: string(res.Output), StatusCode: res.ExitStatus}
+		return &runFailedError{ErrorLogs: string(res.Error), StatusCode: res.ExitStatus}
 	}
 
 	return nil
@@ -331,7 +370,7 @@ func (r *SandboxRunner) ExecuteInSandbox(params RunParams) (*executionResult, er
 		Environment: params.ContainerEnv,
 		ExecveParam: container.ExecveParam{
 			Args:     params.Args,
-			Env:      []string{"PATH=/usr/local/bin:/usr/bin:/bin", "GOCACHE=/tmp/gocache", "JAVA_HOME=/etc/java-21-openjdk"},
+			Env:      []string{"PATH=/usr/local/bin:/usr/bin:/bin", "GOCACHE=/gocache", "JAVA_HOME=/etc/java-21-openjdk"},
 			Files:    []uintptr{stdinR.Fd(), stdoutW.Fd(), stderrW.Fd()},
 			RLimits:  rlims.PrepareRLimit(),
 			SyncFunc: syncFunc,
@@ -345,7 +384,7 @@ func (r *SandboxRunner) ExecuteInSandbox(params RunParams) (*executionResult, er
 	stdoutR.Close()
 	stdoutW.Close()
 	stderrR.Close()
-	stdoutW.Close()
+	stderrW.Close()
 	wg.Wait()
 
 	execRes := &executionResult{
@@ -414,6 +453,10 @@ func pipeWriter(ctx context.Context, pipe *os.File, in string) {
 }
 
 func (r *SandboxRunner) PrepareContainer(workdir string) (container.Environment, error) {
+	goCacheUpper := filepath.Join(workdir, "gocache-upper")
+	goCacheWork := filepath.Join(workdir, "gocache-work")
+	overlayData := fmt.Sprintf("lowerdir=%s,upperdir=%s,workdir=%s,userxattr,index=off", goCacheShared, goCacheUpper, goCacheWork)
+
 	mb := mount.NewBuilder().
 		WithBind("/bin", "bin", true).
 		WithBind("/lib", "lib", true).
@@ -422,14 +465,21 @@ func (r *SandboxRunner) PrepareContainer(workdir string) (container.Environment,
 		WithBind("/etc/ld.so.cache", "etc/ld.so.cache", true).
 		WithBind("/etc/alternatives", "etc/alternatives", true).
 		WithBind("/etc/java-21-openjdk", "etc/java-21-openjdk", true).
-		WithBind("/etc/ssl", "etc/ssl", true).                 // SSL Certs
-		WithBind("/etc/pki", "etc/pki", true).                 // CA Certs (RedHat/Fedora)
+		WithBind("/etc/ssl", "etc/ssl", true).                         // SSL Certs
+		WithBind("/etc/pki", "etc/pki", true).                         // CA Certs (RedHat/Fedora)
 		WithBind("/etc/crypto-policies", "etc/crypto-policies", true). // Crypto policies
 		WithBind("/etc/ca-certificates", "etc/ca-certificates", true). // Ubuntu/Debian Certs
 		WithProc().
 		WithBind("/dev/null", "dev/null", false).
 		WithBind("/dev/urandom", "dev/urandom", false).
 		WithBind("/dev/random", "dev/random", false).
+		WithMount(mount.Mount{
+			Source: "overlay",
+			Target: "gocache",
+			FsType: "overlay",
+			Data:   overlayData,
+			Flags:  unix.MS_NOSUID | unix.MS_NODEV,
+		}).
 		WithTmpfs("tmp", "size=128m,nr_inodes=4k").
 		WithTmpfs("w", "size=32m,nr_inodes=4k").
 		FilterNotExist()
@@ -439,17 +489,17 @@ func (r *SandboxRunner) PrepareContainer(workdir string) (container.Environment,
 	cloneFlag := unix.CLONE_NEWIPC | unix.CLONE_NEWNET | unix.CLONE_NEWNS | unix.CLONE_NEWPID | unix.CLONE_NEWUSER | unix.CLONE_NEWUTS
 
 	b := container.Builder{
-		Root:          workdir,
+		Root:          path.Join(workdir, "root"),
 		WorkDir:       "/w",
 		Mounts:        mounts.Mounts,
 		Stderr:        os.Stderr,
 		CredGenerator: newCredGen(),
 		CloneFlags:    uintptr(cloneFlag),
 		SymbolicLinks: []container.SymbolicLink{
-			{LinkPath:"/dev/fd", Target:"/proc/self/fd"}, 
-			{LinkPath:"/dev/stdin", Target:"/proc/self/fd/0"}, 
-			{LinkPath:"/dev/stdout", Target:"/proc/self/fd/1"}, 
-			{LinkPath:"/dev/stderr", Target:"/proc/self/fd/2"},
+			{LinkPath: "/dev/fd", Target: "/proc/self/fd"},
+			{LinkPath: "/dev/stdin", Target: "/proc/self/fd/0"},
+			{LinkPath: "/dev/stdout", Target: "/proc/self/fd/1"},
+			{LinkPath: "/dev/stderr", Target: "/proc/self/fd/2"},
 		},
 	}
 	return b.Build()
@@ -457,18 +507,35 @@ func (r *SandboxRunner) PrepareContainer(workdir string) (container.Environment,
 
 func (r *SandboxRunner) prepareContainers() error {
 	for i := 0; i < r.Config.ContainersPoolSize; i++ {
-		workDir, err := os.MkdirTemp("", "rankode-container-")
-		if err != nil {
-			return errors.Wrap(err, "failed to create temp dir")
+		containerPath := fmt.Sprintf("/tmp/rankode-container-%d", i)
+		if _, err := os.Stat(containerPath); err != nil {
+			if err := os.Mkdir(containerPath, 0777); err != nil {
+				return fmt.Errorf("failed to create container dir: %w", err)
+			}
+			if err := os.Mkdir(path.Join(containerPath, "root"), 0777); err != nil {
+				return fmt.Errorf("failed to create container root: %w", err)
+			}
+			if err := os.Mkdir(path.Join(containerPath, "root", "gocache"), 0777); err != nil {
+				return fmt.Errorf("failed to create container root gocache: %w", err)
+			}
+			if err := os.Mkdir(path.Join(containerPath, "gocache-upper"), 0777); err != nil {
+				return fmt.Errorf("failed to create container gocache-upper: %w", err)
+			}
+			os.Chmod(path.Join(containerPath, "gocache-upper"), 0777)
+			if err := os.Mkdir(path.Join(containerPath, "gocache-work"), 0777); err != nil {
+				return fmt.Errorf("failed to create container gocache-work: %w", err)
+			}
+			os.Chmod(path.Join(containerPath, "gocache-work"), 0777)
 		}
-		c, err := r.PrepareContainer(workDir)
+
+		c, err := r.PrepareContainer(containerPath)
 
 		if err != nil {
 			return errors.Wrap(err, "failed to create container")
 		}
 		r.containers <- &sandboxContainerEnv{
 			Environment: c,
-			WorkDir:     workDir,
+			WorkDir:     containerPath,
 		}
 	}
 	return nil

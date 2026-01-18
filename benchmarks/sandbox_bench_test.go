@@ -21,7 +21,7 @@ func initSandbox() error {
 		ContainersPoolSize: 1,
 	}
 	var err error
-	runner, err = sandbox.NewSandboxRunner(cfg)
+	runner = sandbox.NewSandboxRunner(cfg)
 	if err != nil {
 		return err
 	}
@@ -69,7 +69,7 @@ func main() {
 			b.Fatalf("Run failed: %v", err)
 		}
 		if res.Status != models.AttemptStatusSuccessful {
-			b.Fatalf("Unexpected status: %v", res.Status)
+			b.Fatalf("Unexpected status: %v %s", res.Status, res.Error)
 		}
 	}
 }

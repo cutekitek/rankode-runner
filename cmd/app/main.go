@@ -39,7 +39,7 @@ func main() {
 	cfg, err := config.NewConfig()
 	panicErr(err)
 	setLogLevel(cfg.LogLevel)
-	runner, err := sandbox.NewSandboxRunner(sandbox.SandboxRunnerConfig{
+	runner := sandbox.NewSandboxRunner(sandbox.SandboxRunnerConfig{
 		RunnerScriptsPath:  "languages",
 		ContainersPoolSize: runtime.NumCPU(),
 	})

@@ -1,0 +1,8 @@
+{
+    "build": [],
+    "build_memory_limit": 640000,
+    "build_timeout": 20000,
+    "build_max_file_size": 100000,
+    "codefile": "code.sh",
+    "run": ["/usr/bin/sh", "code.sh"]
+}

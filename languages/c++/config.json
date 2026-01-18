@@ -1,5 +1,5 @@
 {
-    "build": ["/usr/bin/g++", "-O2", "-o", "run", "main.cpp"],
+    "build": ["/usr/bin/g++", "-w", "-O2", "-o", "run", "main.cpp"],
     "build_memory_limit": 134217728,
     "build_timeout": 2000000,
     "build_max_file_size": 10000000,

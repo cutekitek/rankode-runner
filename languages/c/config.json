@@ -1,5 +1,5 @@
 {
-    "build": ["/usr/bin/gcc", "-O2", "-o", "run", "main.c"],
+    "build": ["/usr/bin/gcc", "-w", "-O2", "-o", "run", "main.c"],
     "build_memory_limit": 134217728,
     "build_timeout": 2000000,
     "build_max_file_size": 10000000,
