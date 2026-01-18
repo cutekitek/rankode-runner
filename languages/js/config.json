@@ -4,5 +4,7 @@
     "build_timeout": 2000000,
     "build_max_file_size": 10000000,
     "run": ["/usr/bin/node", "main.js"],
-    "codefile": "main.js"
+    "codefile": "main.js",
+    "verifier_file": "verifier.js",
+    "verifier_run": ["/usr/bin/node", "verifier.js"]
 }

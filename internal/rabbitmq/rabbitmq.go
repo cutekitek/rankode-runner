@@ -148,6 +148,31 @@ func (r *RabbitMQHandler) worker() {
 	for task := range r.tasksChan {
 
 		request := &dto.RunRequest{Image: task.Language, Code: task.Code, Timeout: time.Duration(task.Timeout) * time.Millisecond, MaxOutputSize: int(task.MaxOutputSize)}
+
+		if task.VerificationFileName != "" {
+			input, err := r.fileStorage.GetFile(context.Background(), task.VerificationFileName)
+			if err != nil {
+				slog.Error("failed to load verification file", "error", err)
+				r.send(&models.AttemptResponse{
+					Id:     task.Id,
+					Status: models.AttemptStatusInternalError,
+					Error:  fmt.Sprintf("failed to load verification file %s: %s", task.VerificationFileName, err),
+				})
+				return
+			}
+			data, err := io.ReadAll(input)
+			if err != nil {
+				slog.Error("failed to load verification file", "error", err)
+				r.send(&models.AttemptResponse{
+					Id:     task.Id,
+					Status: models.AttemptStatusInternalError,
+					Error:  fmt.Sprintf("failed to load verification file %s: %s", task.VerificationFileName, err),
+				})
+				return
+			}
+			request.VerificationCode = string(data)
+		}
+
 		for _, test := range task.TestCases {
 			input, err := r.fileStorage.GetFile(context.Background(), test.InputFileName)
 			if err != nil {

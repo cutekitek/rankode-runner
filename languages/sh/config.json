@@ -4,5 +4,7 @@
     "build_timeout": 20000,
     "build_max_file_size": 100000,
     "codefile": "code.sh",
-    "run": ["/usr/bin/sh", "code.sh"]
+    "run": ["/usr/bin/sh", "code.sh"],
+    "verifier_file": "verifier.sh",
+    "verifier_run": ["/usr/bin/sh", "verifier.sh"]
 }

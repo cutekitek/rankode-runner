@@ -4,5 +4,8 @@
     "build_memory_limit": 536870912,
     "build_timeout": 2000000,
     "build_max_file_size": 100000000,
-    "run": ["./run"]
+    "run": ["./run"],
+    "verifier_file": "verifier.go",
+    "verifier_build": ["/usr/bin/go", "build", "-o", "run", "main.go", "verifier.go"],
+    "verifier_run": ["./run"]
 }

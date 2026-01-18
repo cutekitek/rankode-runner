@@ -127,6 +127,94 @@ func main() {
 	}
 }
 
+func TestSandboxRunner_Verification(t *testing.T) {
+	tests := []struct {
+		language         string
+		code             string
+		verificationCode string
+		expected         string
+	}{
+		{
+			language: "python3",
+			code:     "def add(a, b):\n    return a + b",
+			verificationCode: `import solution
+print(solution.add(2, 3))`,
+			expected: "5\n",
+		},
+		{
+			language: "js",
+			code:     "function add(a, b) { return a + b; }\nmodule.exports = { add };",
+			verificationCode: `const { add } = require('./main');
+console.log(add(2, 3));`,
+			expected: "5\n",
+		},
+		{
+			language: "c",
+			code:     "int add(int a, int b) { return a + b; }",
+			verificationCode: `#include <stdio.h>
+extern int add(int a, int b);
+int main() { printf("%d\n", add(2, 3)); return 0; }`,
+			expected: "5\n",
+		},
+		{
+			language: "c++",
+			code:     "int add(int a, int b) { return a + b; }",
+			verificationCode: `#include <iostream>
+extern int add(int a, int b);
+int main() { std::cout << add(2, 3) << std::endl; return 0; }`,
+			expected: "5\n",
+		},
+		{
+			language: "go",
+			code:     "package main\nfunc Add(a, b int) int { return a + b }",
+			verificationCode: `package main
+import "fmt"
+func main() { fmt.Println(Add(2, 3)) }`,
+			expected: "5\n",
+		},
+		{
+			language:         "java",
+			code:             "public class Main { public static int add(int a, int b) { return a + b; } }",
+			verificationCode: `public class Verifier { public static void main(String[] args) { System.out.println(Main.add(2, 3)); } }`,
+			expected:         "5\n",
+		},
+		{
+			language: "sh",
+			code:     "add() { echo $(($1 + $2)); }",
+			verificationCode: `. ./code.sh
+add 2 3`,
+			expected: "5\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.language, func(t *testing.T) {
+			req := &dto.RunRequest{
+				Image:            tt.language,
+				Code:             tt.code,
+				VerificationCode: tt.verificationCode,
+				Timeout:          5000 * time.Millisecond,
+				MemoryLimit:      256 * 1024 * 1024,
+				MaxFilesSize:     100 * 1024 * 1024,
+				MaxOutputSize:    1024 * 1024,
+			}
+			res, err := sbRunner.Run(req)
+			if err != nil {
+				t.Fatalf("Run failed: %v", err)
+			}
+			if res.Status != models.AttemptStatusSuccessful {
+				t.Fatalf("Unexpected status: %v, error: %s", res.Status, res.Error)
+			}
+			if len(res.Output) != 1 {
+				t.Fatalf("Expected exactly one output case, got %d", len(res.Output))
+			}
+			if res.Output[0].Output != tt.expected {
+				t.Fatalf("Output mismatch: expected %q, got %q", tt.expected, res.Output[0].Output)
+			}
+		})
+	}
+}
+
 func TestSandboxRunner_Input(t *testing.T) {
 	tests := []struct {
 		language string

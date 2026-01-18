@@ -1,8 +1,11 @@
 {
-    "build": [],
-    "build_memory_limit": 134217728,
+    "build": ["/usr/bin/javac", "Main.java"],
+    "build_memory_limit": 536870912,
     "build_timeout": 2000000,
     "build_max_file_size": 10000000,
     "codefile": "Main.java",
-    "run": ["/usr/lib/jvm/java-21-openjdk-arm64/bin/java", "Main.java"]
+    "run": ["/usr/bin/java", "Main"],
+    "verifier_file": "Verifier.java",
+    "verifier_build": ["/usr/bin/javac", "Main.java", "Verifier.java"],
+    "verifier_run": ["/usr/bin/java", "Verifier"]
 }

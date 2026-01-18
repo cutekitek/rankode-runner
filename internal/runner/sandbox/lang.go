@@ -14,6 +14,9 @@ type languageConfig struct {
 	BuildTimeout     time.Duration `json:"build_timeout"`
 	BuildMaxFileSize int           `json:"build_max_file_size"`
 	CodeFile         string        `json:"codefile"`
+	VerifierFile     string        `json:"verifier_file"`
+	VerifierBuildCmd []string      `json:"verifier_build"`
+	VerifierRunCmd   []string      `json:"verifier_run"`
 }
 
 func NewLangConfigFromFile(path string) (*languageConfig, error) {

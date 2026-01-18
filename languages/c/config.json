@@ -4,5 +4,8 @@
     "build_timeout": 2000000,
     "build_max_file_size": 10000000,
     "codefile": "main.c",
-    "run": ["./run"]
+    "run": ["./run"],
+    "verifier_file": "verifier.c",
+    "verifier_build": ["/usr/bin/gcc", "-w", "-O2", "-o", "run", "main.c", "verifier.c"],
+    "verifier_run": ["./run"]
 }

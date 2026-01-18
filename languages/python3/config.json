@@ -3,5 +3,8 @@
     "build_memory_limit": 640000,
     "build_timeout": 20000,
     "build_max_file_size": 100000,
-    "run": ["/usr/bin/python3", "code"]
+    "codefile": "solution.py",
+    "run": ["/usr/bin/python3", "solution.py"],
+    "verifier_file": "verifier.py",
+    "verifier_run": ["/usr/bin/python3", "verifier.py"]
 }

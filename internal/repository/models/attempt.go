@@ -29,7 +29,8 @@ type AttemptRequest struct {
 	Timeout       int64  `json:"timeout"`
 	MaxOutputSize int64  `json:"max_output_size"`
 
-	TestCases []TestCase `json:"test_cases"`
+	TestCases            []TestCase `json:"test_cases"`
+	VerificationFileName string     `json:"verification_file"`
 }
 
 type TestCase struct {

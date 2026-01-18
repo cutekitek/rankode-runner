@@ -150,8 +150,13 @@ func (r *SandboxRunner) Run(req *dto.RunRequest) (*dto.RunResult, error) {
 	}
 
 	// Build
-	if len(langConfig.BuildCmd) > 0 {
-		if err := r.build(langConfig, container); err != nil {
+	buildCmd := langConfig.BuildCmd
+	if req.VerificationCode != "" && len(langConfig.VerifierBuildCmd) > 0 {
+		buildCmd = langConfig.VerifierBuildCmd
+	}
+
+	if len(buildCmd) > 0 {
+		if err := r.build(langConfig, container, buildCmd); err != nil {
 			if res, ok := err.(*runFailedError); ok {
 				return &dto.RunResult{
 					Status: models.AttemptStatusBuildFailed,
@@ -162,16 +167,12 @@ func (r *SandboxRunner) Run(req *dto.RunRequest) (*dto.RunResult, error) {
 		}
 	}
 
-	// Run test cases
-	result, err := r.runTestCases(req, container, langConfig)
-	if err != nil {
-		return &dto.RunResult{
-			Status: models.AttemptStatusInternalError,
-			Error:  "failed to run a test",
-		}, nil
+	// Run test cases or verification
+	if req.VerificationCode != "" {
+		return r.runVerification(req, container, langConfig)
 	}
 
-	return result, nil
+	return r.runTestCases(req, container, langConfig)
 }
 
 func (r *SandboxRunner) getLangConfig(req *dto.RunRequest) (*languageConfig, error) {
@@ -192,9 +193,19 @@ func (r *SandboxRunner) initFiles(req *dto.RunRequest, env container.Environment
 		codeFile = "/w/" + lang.CodeFile
 	}
 
-	files, err := env.Open([]container.OpenCmd{
+	openCmds := []container.OpenCmd{
 		{Path: codeFile, Flag: os.O_WRONLY | os.O_CREATE | os.O_TRUNC, Perm: 0777},
-	})
+	}
+
+	if req.VerificationCode != "" && lang.VerifierFile != "" {
+		openCmds = append(openCmds, container.OpenCmd{
+			Path: "/w/" + lang.VerifierFile,
+			Flag: os.O_WRONLY | os.O_CREATE | os.O_TRUNC,
+			Perm: 0777,
+		})
+	}
+
+	files, err := env.Open(openCmds)
 	if err != nil {
 		return fmt.Errorf("failed to open files in container: %w", err)
 	}
@@ -206,6 +217,12 @@ func (r *SandboxRunner) initFiles(req *dto.RunRequest, env container.Environment
 
 	if _, err := io.Copy(files[0], strings.NewReader(req.Code)); err != nil {
 		return fmt.Errorf("failed to copy code file: %w", err)
+	}
+
+	if req.VerificationCode != "" && lang.VerifierFile != "" {
+		if _, err := io.Copy(files[1], strings.NewReader(req.VerificationCode)); err != nil {
+			return fmt.Errorf("failed to copy verification file: %w", err)
+		}
 	}
 
 	return nil
@@ -220,10 +237,10 @@ func (r *runFailedError) Error() string {
 	return fmt.Sprintf("failed to run(%d)", r.StatusCode)
 }
 
-func (r *SandboxRunner) build(cfg *languageConfig, cenv container.Environment) error {
+func (r *SandboxRunner) build(cfg *languageConfig, cenv container.Environment, args []string) error {
 	params := RunParams{
 		ContainerEnv: cenv,
-		Args:         cfg.BuildCmd,
+		Args:         args,
 		MaxFileSize:  int64(cfg.BuildMaxFileSize),
 		Timeout:      cfg.BuildTimeout,
 		MemoryLimit:  int64(cfg.BuildMemoryLimit),
@@ -242,6 +259,55 @@ func (r *SandboxRunner) build(cfg *languageConfig, cenv container.Environment) e
 	}
 
 	return nil
+}
+
+func (r *SandboxRunner) runVerification(req *dto.RunRequest, cenv container.Environment, cfg *languageConfig) (*dto.RunResult, error) {
+	params := RunParams{
+		ContainerEnv:  cenv,
+		Args:          cfg.VerifierRunCmd,
+		MaxFileSize:   int64(req.MaxOutputSize),
+		Timeout:       req.Timeout,
+		MemoryLimit:   int64(req.MemoryLimit),
+		MaxOutputSize: int64(req.MaxOutputSize),
+	}
+
+	res, err := r.ExecuteInSandbox(params)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to execute verifier")
+	}
+
+	result := &dto.RunResult{
+		Status:        models.AttemptStatusSuccessful,
+		MemoryUsage:   int(res.Memory),
+		ExecutionTime: res.Time,
+	}
+
+	caseStatus := dto.RunCaseResult{
+		Output: string(res.Output),
+		Status: models.TestCaseStatusComplete,
+	}
+
+	if res.Status != runner.StatusNormal {
+		switch res.Status {
+		case runner.StatusMemoryLimitExceeded:
+			caseStatus.Status = models.TestCaseStatusOutOfMemory
+		case runner.StatusTimeLimitExceeded:
+			caseStatus.Status = models.TestCaseStatusTimeout
+		case runner.StatusOutputLimitExceeded:
+			caseStatus.Status = models.TestCaseStatusOutputOverflow
+		default:
+			caseStatus.Status = models.TestCaseStatusRunningError
+		}
+		result.Error = string(res.Error)
+		result.Status = models.AttemptStatusRunFailed
+	} else if res.ExitStatus != 0 {
+		caseStatus.Status = models.TestCaseStatusRunningError
+		result.Error = string(res.Error)
+		result.Status = models.AttemptStatusRunFailed
+	}
+
+	result.Output = append(result.Output, caseStatus)
+	return result, nil
 }
 
 func (r *SandboxRunner) runTestCases(req *dto.RunRequest, cenv container.Environment, cfg *languageConfig) (*dto.RunResult, error) {
@@ -370,7 +436,7 @@ func (r *SandboxRunner) ExecuteInSandbox(params RunParams) (*executionResult, er
 		Environment: params.ContainerEnv,
 		ExecveParam: container.ExecveParam{
 			Args:     params.Args,
-			Env:      []string{"PATH=/usr/local/bin:/usr/bin:/bin", "GOCACHE=/gocache", "JAVA_HOME=/etc/java-21-openjdk"},
+			Env:      []string{"PATH=/usr/local/bin:/usr/bin:/bin", "GOCACHE=/gocache", "JAVA_HOME=/etc/java21-openjdk", "GO111MODULE=off"},
 			Files:    []uintptr{stdinR.Fd(), stdoutW.Fd(), stderrW.Fd()},
 			RLimits:  rlims.PrepareRLimit(),
 			SyncFunc: syncFunc,
@@ -464,7 +530,7 @@ func (r *SandboxRunner) PrepareContainer(workdir string) (container.Environment,
 		WithBind("/usr", "usr", true).
 		WithBind("/etc/ld.so.cache", "etc/ld.so.cache", true).
 		WithBind("/etc/alternatives", "etc/alternatives", true).
-		WithBind("/etc/java-21-openjdk", "etc/java-21-openjdk", true).
+		WithBind("/etc/java21-openjdk", "etc/java21-openjdk", true).
 		WithBind("/etc/ssl", "etc/ssl", true).                         // SSL Certs
 		WithBind("/etc/pki", "etc/pki", true).                         // CA Certs (RedHat/Fedora)
 		WithBind("/etc/crypto-policies", "etc/crypto-policies", true). // Crypto policies

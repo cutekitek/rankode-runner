@@ -13,7 +13,11 @@ func RunResultToAttemptResult(req *models.AttemptRequest, result *dto.RunResult)
 		Tests:       make([]models.TestStatus, 0, len(result.Output)),
 	}
 	for i, out := range result.Output {
-		status := models.TestStatus{CaseId: req.TestCases[i].Id, Status: out.Status, Output: out.Output}
+		caseId := int64(0)
+		if i < len(req.TestCases) {
+			caseId = req.TestCases[i].Id
+		}
+		status := models.TestStatus{CaseId: caseId, Status: out.Status, Output: out.Output}
 		resp.Tests = append(resp.Tests, status)
 	}
 	return resp

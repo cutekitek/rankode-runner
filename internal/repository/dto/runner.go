@@ -7,13 +7,14 @@ import (
 )
 
 type RunRequest struct {
-	Image         string
-	Code          string
-	Input         []string
-	Timeout       time.Duration
-	MemoryLimit   int
-	MaxFilesSize  int
-	MaxOutputSize int
+	Image            string
+	Code             string
+	Input            []string
+	Timeout          time.Duration
+	MemoryLimit      int
+	MaxFilesSize     int
+	MaxOutputSize    int
+	VerificationCode string
 }
 
 type RunResult struct {
