@@ -9,10 +9,10 @@ import (
 )
 
 type Config struct {
-	MinIOHost        string `env:"MINIO_HOST" env-default:"127.0.0.1:9000"`
-	MinIOLogin       string `env:"MINIO_LOGIN" env-required:"true"`
-	MinIOPassword    string `env:"MINIO_PASSWORD" env-required:"true"`
-	MinIOBucket      string `env:"MINIO_BUCKET" env-default:"tasks"`
+	S3Endpoint       string `env:"S3_ENDPOINT" env-default:"127.0.0.1:8333"`
+	S3AccessKey      string `env:"S3_ACCESS_KEY" env-required:"true"`
+	S3SecretKey      string `env:"S3_SECRET_KEY" env-required:"true"`
+	S3Bucket         string `env:"S3_BUCKET" env-default:"tasks"`
 	RabbitMQHost     string `env:"RABBIT_HOST" env-default:"127.0.0.1"`
 	RabbitMQPort     int    `env:"RABBIT_PORT" env-default:"5672"`
 	RabbitMQUser     string `env:"RABBIT_USER" env-required:"true"`

@@ -14,15 +14,16 @@ type FileStorage struct {
 }
 
 type Config struct {
-	Url      string
-	Login    string
-	Password string
-	Bucket   string
+	Endpoint  string
+	AccessKey string
+	SecretKey string
+	Bucket    string
 }
 
 func NewFileStorage(cfg Config) *FileStorage {
-	client, err := minio.New(cfg.Url, &minio.Options{
-		Creds: credentials.NewStaticV4(cfg.Login, cfg.Password, ""),
+	client, err := minio.New(cfg.Endpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, ""),
+		Secure: false,
 	})
 	if err != nil {
 		panic(err)

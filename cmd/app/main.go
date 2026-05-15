@@ -47,10 +47,10 @@ func main() {
 	panicErr(runner.Init())
 	panicErr(err)
 	fileStorage := files.NewFileStorage(files.Config{
-		Url:      cfg.MinIOHost,
-		Login:    cfg.MinIOLogin,
-		Password: cfg.MinIOPassword,
-		Bucket:   cfg.MinIOBucket,
+		Endpoint:  cfg.S3Endpoint,
+		AccessKey: cfg.S3AccessKey,
+		SecretKey: cfg.S3SecretKey,
+		Bucket:    cfg.S3Bucket,
 	})
 	listener, err := rabbitmq.NewRabbitMQHandler(rabbitmq.RabbitMqHandlerConfig{
 		Login:        cfg.RabbitMQUser,

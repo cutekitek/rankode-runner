@@ -9,10 +9,11 @@ fi
 echo "--- Preparing System ---"
 echo "http://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories
 echo "http://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/repositories
+apk add --no-cache curl bash build-base
 apk update
 apk upgrade
 
-apk add --no-cache curl bash build-base
+
 
 APK_PACKAGES=""
 
