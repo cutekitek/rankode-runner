@@ -26,6 +26,7 @@ type RunResult struct {
 }
 
 type RunCaseResult struct {
-	Output string
-	Status models.TestCaseStatus
+	Output        string
+	Status        models.TestCaseStatus
+	ExecutionTime int64
 }

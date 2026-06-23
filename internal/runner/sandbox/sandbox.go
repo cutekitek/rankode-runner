@@ -283,8 +283,9 @@ func (r *SandboxRunner) runVerification(req *dto.RunRequest, cenv container.Envi
 	}
 
 	caseStatus := dto.RunCaseResult{
-		Output: string(res.Output),
-		Status: models.TestCaseStatusComplete,
+		Output:        string(res.Output),
+		Status:        models.TestCaseStatusComplete,
+		ExecutionTime: int64(res.Time / time.Millisecond),
 	}
 
 	if res.Status != runner.StatusNormal {
@@ -331,8 +332,9 @@ func (r *SandboxRunner) runTestCases(req *dto.RunRequest, cenv container.Environ
 		}
 
 		caseStatus := dto.RunCaseResult{
-			Output: string(res.Output),
-			Status: models.TestCaseStatusComplete,
+			Output:        string(res.Output),
+			Status:        models.TestCaseStatusComplete,
+			ExecutionTime: int64(res.Time / time.Millisecond),
 		}
 
 		result.MemoryUsage = int(res.Memory)
